@@ -2,6 +2,7 @@
   command: mdfind -onlyin /Applications "kMDItemCFBundleIdentifier == 'com.apple.dt.Xcode'"
   register: xcode_app
   changed_when: false
+  check_mode: no
 
 - name: Register xcode_installed
   set_fact:
@@ -12,6 +13,7 @@
   register: xcode_app_output
   when: xcode_installed
   changed_when: false
+  check_mode: no
 
 - name: Export Installed Xcode version
   set_fact:
@@ -22,6 +24,7 @@
   shell: echo -n "{{ xcode_xip_location }}" | cut -d "_" -f 2 | sed s/'.xip'//g
   register: xcode_path_parse
   changed_when: false
+  check_mode: no
 
 - name: Export Candidate Xcode version
   set_fact:
@@ -39,25 +42,11 @@
         path: /Applications/Xcode.app
         state: absent
 
-    - name: Install Xcode from XIP file Location
-      command: xip --expand {{ xcode_xip_location }}
-      args:
-        chdir: /Applications
-      poll: 5
-      async: "{{ xcode_xip_extraction_timeout }}" # Prevent SSH connections timing out waiting for extraction
+    - name: Install Xcode and prepare
+      script: ../library/xcode.sh {{ xcode_build }} {{ xcode_xip_location }}
 
-    - name: Accept License Agreement
-      command: "{{ xcode_build }} -license accept"
-      become: true
-
-    - name: Run Xcode first launch
-      command: "{{ xcode_build }} -runFirstLaunch"
-      become: true
-      when: xcode_major_version | int >= 9
-
-    - name: Xcode 8 packages
-      include: xcode8_packages.yml
-      when: xcode_major_version | int == 8
+    - name: Install Rosetta support
+      shell: softwareupdate --install-rosetta --agree-to-license
   when: not xcode_installed or xcode_installed_version is version(xcode_target_version, '!=')
 
 - name: Enable Developer Mode
